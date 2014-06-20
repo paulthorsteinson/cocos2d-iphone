@@ -102,7 +102,7 @@ static CCTextureCache *sharedTextureCache;
 		NSOpenGLPixelFormat *pf = [view pixelFormat];
 		NSOpenGLContext *share = [view openGLContext];
 
-		_auxGLcontext = [[NSOpenGLContext alloc] initWithFormat:pf shareContext:share];
+		_auxGLcontext = [[NSOpenGLContext alloc] initWithFormat:[NSOpenGLView defaultPixelFormat] shareContext:share];
 
 #endif // __CC_PLATFORM_MAC
 
