@@ -126,7 +126,7 @@
 
 - (void) mouseDragged:(NSEvent*)event
 {
-    CGPoint dragPos = [event locationInNode:self];
+    CGPoint dragPos = CGPointZero;//[event locationInNode:self];
     
     [self inputDraggedWithPos:dragPos];
     

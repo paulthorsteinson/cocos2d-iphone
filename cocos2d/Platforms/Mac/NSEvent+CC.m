@@ -33,12 +33,12 @@
 
 @implementation NSEvent (CC)
 
-- (CGPoint) locationInNode:(CCNode *)node
-{
-    CCDirector* dir = [CCDirector sharedDirector];
-    CGPoint mouseLocation = [dir convertEventToGL:self];
-    return [node convertToNodeSpace:mouseLocation];
-}
+//- (CGPoint) locationInNode:(CCNode *)node
+//{
+//    CCDirector* dir = [CCDirector sharedDirector];
+//    CGPoint mouseLocation = [dir convertEventToGL:self];
+//    return [node convertToNodeSpace:mouseLocation];
+//}
 
 - (CGPoint) locationInWorld
 {

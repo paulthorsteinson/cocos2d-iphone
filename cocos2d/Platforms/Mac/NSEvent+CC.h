@@ -33,7 +33,7 @@
 
 @interface NSEvent (CC)
 
-- (CGPoint) locationInNode:(CCNode*) node;
+//- (CGPoint) locationInNode:(CCNode*) node;
 
 - (CGPoint) locationInWorld;
 
