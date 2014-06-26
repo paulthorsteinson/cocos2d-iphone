@@ -13,7 +13,7 @@
 # Variables setup
 # ----------------------------------------------------
 SCRIPT_VER="v0.9.5"
-COCOS2D_VER="Cocos2D-v3.0.0.rc"
+COCOS2D_VER="Cocos2D-v3.0.0"
 COCOS2D_DST_DIR="cocos2d v3.x"
 SCRIPT_DIR="$(dirname $0)"
 
@@ -311,11 +311,11 @@ if $INSTALL ; then
 	printf " ${GREEN}✔${COLOREND}\n"
 
 	# Copy kazmath files
-	echo -n "...copying kazmath files"
-	LIBS_DIR="$DST_DIR/Support/Libraries/lib_kazmath.xctemplate/Libraries/"
-	copy_files "external/kazmath" "$LIBS_DIR"
-	copy_files "LICENSE_Kazmath.txt" "$LIBS_DIR"
-	printf " ${GREEN}✔${COLOREND}\n"	
+	#echo -n "...copying kazmath files"
+	#LIBS_DIR="$DST_DIR/Support/Libraries/lib_kazmath.xctemplate/Libraries/"
+	#copy_files "external/kazmath" "$LIBS_DIR"
+	#copy_files "LICENSE_Kazmath.txt" "$LIBS_DIR"
+	#printf " ${GREEN}✔${COLOREND}\n"	
 
 	# Copy CCBReader files
 	echo -n "...copying CCBReader files"

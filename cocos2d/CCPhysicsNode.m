@@ -22,10 +22,12 @@
  * THE SOFTWARE.
  */
 
+#define CP_ALLOW_PRIVATE_ACCESS 1
+
 #import "CCPhysicsNode.h"
 #import "CCPhysics+ObjectiveChipmunk.h"
-
 #import <objc/runtime.h>
+
 
 // Do not change this value unless you redefine the cpBitmask type to have more than 32 bits.
 #define MAX_CATEGORIES 32
@@ -48,6 +50,7 @@
 }
 
 -(cpArbiter *)arbiter {return _arbiter;}
+-(void)setArbiter:(cpArbiter *)arbiter {_arbiter = arbiter;}
 
 // Check that the arbiter is set and return it.
 -(cpArbiter *)arb
@@ -58,6 +61,7 @@
 
 -(CCContactSet)contacts
 {
+	// TODO this needs to be fixed for 64 bit if CG types are disabled.
 	// This function cast should be safe on any ABI that also supports objc_msgSend_stret().
 	return ((CCContactSet (*)(cpArbiter *))cpArbiterGetContactPointSet)(self.arb);
 }
@@ -68,11 +72,11 @@
 -(CGFloat)restitution {return cpArbiterGetRestitution(self.arb);}
 -(void)setRestitution:(CGFloat)restitution {cpArbiterSetRestitution(self.arb, restitution);}
 
--(CGPoint)surfaceVelocity {return cpArbiterGetSurfaceVelocity(self.arb);}
--(void)setSurfaceVelocity:(CGPoint)surfaceVelocity {cpArbiterSetSurfaceVelocity(self.arb, surfaceVelocity);}
+-(CGPoint)surfaceVelocity {return CPV_TO_CCP(cpArbiterGetSurfaceVelocity(self.arb));}
+-(void)setSurfaceVelocity:(CGPoint)surfaceVelocity {cpArbiterSetSurfaceVelocity(self.arb, CCP_TO_CPV(surfaceVelocity));}
 
 -(CGFloat)totalKineticEnergy {return cpArbiterTotalKE(self.arb);}
--(CGPoint)totalImpulse {return cpArbiterTotalImpulse(self.arb);}
+-(CGPoint)totalImpulse {return CPV_TO_CCP(cpArbiterTotalImpulse(self.arb));}
 
 -(id)userData {return cpArbiterGetUserData(self.arb);}
 -(void)setUserData:(id)userData {cpArbiterSetUserData(self.arb, userData);}
@@ -95,7 +99,7 @@
 /// Internal class used to wrap cpCollisionHandlers
 @interface CCPhysicsCollisionHandler : NSObject {
 	cpCollisionHandler *_handler;
-	id _delegate;
+	__weak id _delegate;
 	
 	// Cache the CCPhysicsNode's collision pair singleton.
 	CCPhysicsCollisionPair *_collisionPairSingleton;
@@ -104,6 +108,7 @@
 	BOOL _wildcard;
 	
 	// Cache all the methods, imps and selectors.
+	// TODO should move to using objc_msgSend instead?
 	Method _begin, _preSolve, _postSolve, _separate;
 	IMP _beginImp, _preSolveImp, _postSolveImp, _separateImp;
 	SEL _beginSel, _preSolveSel, _postSolveSel, _separateSel;
@@ -261,6 +266,10 @@ static void PhysicsSeparate(cpArbiter *arb, cpSpace *space, CCPhysicsCollisionHa
 	// CCDrawNode used for drawing the debug overlay.
 	// Only allocated if CCPhysicsNode.debugDraw is YES.
 	CCDrawNode *_debugDraw;
+    
+    //List of moving static handlers that need updating due to thier parent nodes moving.
+    NSMutableSet * _kineticNodes;
+    
 }
 
 // Used by CCNode.physicsNode
@@ -283,19 +292,25 @@ static void PhysicsSeparate(cpArbiter *arb, cpSpace *space, CCPhysicsCollisionHa
 		
 		_collisionPairSingleton = [[CCPhysicsCollisionPair alloc] init];
 		_handlers = [NSMutableSet set];
+        _kineticNodes = [NSMutableSet set];
 	}
 	
 	return self;
 }
 
--(CGPoint)gravity {return _space.gravity;}
--(void)setGravity:(CGPoint)gravity {_space.gravity = gravity;}
+-(CGPoint)gravity {return CPV_TO_CCP(_space.gravity);}
+-(void)setGravity:(CGPoint)gravity {_space.gravity = CCP_TO_CPV(gravity);}
 
 -(int)iterations {return _space.iterations;}
 -(void)setIterations:(int)iterations {_space.iterations = iterations;}
 
 -(CCTime)sleepTimeThreshold {return _space.sleepTimeThreshold;}
 -(void)setSleepTimeThreshold:(CCTime)sleepTimeThreshold {_space.sleepTimeThreshold = sleepTimeThreshold;}
+
+-(NSMutableSet*)kineticNodes
+{
+    return _kineticNodes;
+}
 
 // Collision Delegates
 
@@ -346,10 +361,10 @@ static void PhysicsSeparate(cpArbiter *arb, cpSpace *space, CCPhysicsCollisionHa
 			method_getReturnType(methods[i], returnType, 2);
 			
 			if([phase isEqualToString:@"ccPhysicsCollisionBegin"]){
-				NSAssert(strcmp(returnType, "c") == 0, @"CCPhysicsCollisionBegin delegate methods must return a BOOL.");
+				NSAssert(strcmp(returnType, @encode(BOOL)) == 0, @"CCPhysicsCollisionBegin delegate methods must return a BOOL.");
 				[self handlerForTypeA:typeA typeB:typeB].begin = methods[i];
 			} else if([phase isEqualToString:@"ccPhysicsCollisionPreSolve"]){
-				NSAssert(strcmp(returnType, "c") == 0, @"CCPhysicsCollisionPreSolve delegate methods must return a BOOL.");
+				NSAssert(strcmp(returnType, @encode(BOOL)) == 0, @"CCPhysicsCollisionPreSolve delegate methods must return a BOOL.");
 				[self handlerForTypeA:typeA typeB:typeB].preSolve = methods[i];
 			} else if([phase isEqualToString:@"ccPhysicsCollisionPostSolve"]){
 				// TODO check for no return value?
@@ -374,21 +389,21 @@ static void PhysicsSeparate(cpArbiter *arb, cpSpace *space, CCPhysicsCollisionHa
 
 //MARK: Queries:
 
--(void)pointQueryAt:(CGPoint)point within:(CGFloat)radius block:(BOOL (^)(CCPhysicsShape *, CGPoint, CGFloat))block
+-(void)pointQueryAt:(CGPoint)point within:(CGFloat)radius block:(void (^)(CCPhysicsShape *, CGPoint, CGFloat))block
 {
-	cpSpacePointQuery_b(_space.space, point, radius, CP_SHAPE_FILTER_ALL, ^(cpShape *shape, CGPoint p, CGFloat d, CGPoint g){
-		block([cpShapeGetUserData(shape) userData], p, d);
+	cpSpacePointQuery_b(_space.space, CCP_TO_CPV(point), radius, CP_SHAPE_FILTER_ALL, ^(cpShape *shape, cpVect p, cpFloat d, cpVect g){
+		block([cpShapeGetUserData(shape) userData], CPV_TO_CCP(p), d);
 	});
 }
 
--(void)rayQueryFirstFrom:(CGPoint)start to:(CGPoint)end block:(BOOL (^)(CCPhysicsShape *, CGPoint, CGPoint, CGFloat))block
+-(void)rayQueryFirstFrom:(CGPoint)start to:(CGPoint)end block:(void (^)(CCPhysicsShape *, CGPoint, CGPoint, CGFloat))block
 {
-	cpSpaceSegmentQuery_b(_space.space, start, end, 0.0, CP_SHAPE_FILTER_ALL, ^(cpShape *shape, CGPoint p, CGPoint n, CGFloat t){
-		block([cpShapeGetUserData(shape) userData], p, n, t);
+	cpSpaceSegmentQuery_b(_space.space, CCP_TO_CPV(start), CCP_TO_CPV(end), 0.0, CP_SHAPE_FILTER_ALL, ^(cpShape *shape, cpVect p, cpVect n, cpFloat t){
+		block([cpShapeGetUserData(shape) userData], CPV_TO_CCP(p), CPV_TO_CCP(n), t);
 	});
 }
 
--(void)rectQuery:(CGRect)rect block:(BOOL (^)(CCPhysicsShape *shape))block
+-(void)rectQuery:(CGRect)rect block:(void (^)(CCPhysicsShape *shape))block
 {
 	cpBB bb = cpBBNew(
 		CGRectGetMinX(rect),
@@ -411,6 +426,19 @@ static void PhysicsSeparate(cpArbiter *arb, cpSpace *space, CCPhysicsCollisionHa
 
 -(void)fixedUpdate:(CCTime)delta
 {
+    NSSet * tempKinetics = [_kineticNodes copy];
+    for(CCNode * node in tempKinetics)
+    {
+        NSAssert(node.physicsBody, @"Should have a physics body");
+        NSAssert(node.physicsBody.type == CCPhysicsBodyTypeKinematic, @"Should be kinematic");
+        
+        [node.physicsBody updateKinetics:delta];
+        if(node.physicsBody.type != CCPhysicsBodyTypeKinematic)
+        {
+            [_kineticNodes removeObject:node];
+        }
+    }
+    
 	[_space step:delta];
 	
 	// Null out the arbiter just in case somebody retained a pair.
@@ -418,7 +446,8 @@ static void PhysicsSeparate(cpArbiter *arb, cpSpace *space, CCPhysicsCollisionHa
 }
 
 //MARK: Debug Drawing:
-
+const cpSpaceDebugColor CC_PHYSICS_SHAPE_DEBUG_FILL_COLOR_STATIC = {0.0, 0.0, 1.0, 0.8};
+const cpSpaceDebugColor CC_PHYSICS_SHAPE_DEBUG_FILL_COLOR_KINEMATIC = {1.0, 1.0, 0.0, 0.8};
 const cpSpaceDebugColor CC_PHYSICS_SHAPE_DEBUG_FILL_COLOR = {1.0, 0.0, 0.0, 0.25};
 const cpSpaceDebugColor CC_PHYSICS_SHAPE_DEBUG_OUTLINE_COLOR = {1.0, 1.0, 1.0, 0.5};
 const cpSpaceDebugColor CC_PHYSICS_SHAPE_JOINT_COLOR = {0.0, 1.0, 0.0, 0.5};
@@ -439,29 +468,52 @@ static inline CCColor* ToCCColor(cpSpaceDebugColor c){return [CCColor colorWithR
 
 static void
 DrawCircle(cpVect p, cpFloat a, cpFloat r, cpSpaceDebugColor outline, cpSpaceDebugColor fill, CCDrawNode *draw)
-{[draw drawDot:p radius:r color:ToCCColor(fill)];}
+{[draw drawDot:CPV_TO_CCP(p) radius:r color:ToCCColor(fill)];}
 
 static void
 DrawSegment(cpVect a, cpVect b, cpSpaceDebugColor color, CCDrawNode *draw)
-{[draw drawSegmentFrom:a to:b radius:1.0 color:ToCCColor(color)];}
+{[draw drawSegmentFrom:CPV_TO_CCP(a) to:CPV_TO_CCP(b) radius:1.0 color:ToCCColor(color)];}
 
 static void
 DrawFatSegment(cpVect a, cpVect b, cpFloat r, cpSpaceDebugColor outline, cpSpaceDebugColor fill, CCDrawNode *draw)
-{[draw drawSegmentFrom:a to:b radius:r color:ToCCColor(fill)];}
+{[draw drawSegmentFrom:CPV_TO_CCP(a) to:CPV_TO_CCP(b) radius:r color:ToCCColor(fill)];}
 
 static void
 DrawPolygon(int count, const cpVect *verts, cpFloat r, cpSpaceDebugColor outline, cpSpaceDebugColor fill, CCDrawNode *draw)
-{[draw drawPolyWithVerts:verts count:count fillColor:ToCCColor(fill) borderWidth:1.0 borderColor:ToCCColor(outline)];}
+{
+#if !CP_USE_CGTYPES
+	CGPoint _verts[count];
+	for(int i=0; i<count; i++) _verts[i] = CPV_TO_CCP(verts[i]);
+	[draw drawPolyWithVerts:_verts count:count fillColor:ToCCColor(fill) borderWidth:1.0 borderColor:ToCCColor(outline)];
+#else
+	[draw drawPolyWithVerts:verts count:count fillColor:ToCCColor(fill) borderWidth:1.0 borderColor:ToCCColor(outline)];
+#endif
+}
 
 static void
 DrawDot(cpFloat size, cpVect pos, cpSpaceDebugColor color, CCDrawNode *draw)
-{[draw drawDot:pos radius:size/2.0 color:ToCCColor(color)];}
+{[draw drawDot:CPV_TO_CCP(pos) radius:size/2.0 color:ToCCColor(color)];}
+
 
 static cpSpaceDebugColor
 ColorForShape(cpShape *shape, CCDrawNode *draw)
-{return CC_PHYSICS_SHAPE_DEBUG_FILL_COLOR;}
+{
 
--(void)draw
+    cpBodyType bodyType = cpBodyGetType(shape->body);
+    
+    if(bodyType == CP_BODY_TYPE_KINEMATIC)
+    {
+        return CC_PHYSICS_SHAPE_DEBUG_FILL_COLOR_KINEMATIC;
+    }
+    if(bodyType == CP_BODY_TYPE_STATIC)
+    {
+        return CC_PHYSICS_SHAPE_DEBUG_FILL_COLOR_STATIC;
+    }
+    
+    return CC_PHYSICS_SHAPE_DEBUG_FILL_COLOR;
+}
+
+-(void)draw:(CCRenderer *)renderer transform:(const GLKMatrix4 *)transform
 {
 	if(!_debugDraw) return;
 	
@@ -487,7 +539,7 @@ ColorForShape(cpShape *shape, CCDrawNode *draw)
 	cpSpaceEachBody_b(_space.space, ^(cpBody *body){
 		if(cpBodyGetType(body) == CP_BODY_TYPE_DYNAMIC){
 			cpVect cog = cpBodyLocalToWorld(body, cpBodyGetCenterOfGravity(body));
-			[_debugDraw drawDot:cog radius:1.5 color:[CCColor colorWithRed:1 green:1 blue:0 alpha:1]];
+			[_debugDraw drawDot:CPV_TO_CCP(cog) radius:1.5 color:[CCColor colorWithRed:1 green:1 blue:0 alpha:1]];
 		}
 	});
 }
@@ -517,7 +569,7 @@ ColorForShape(cpShape *shape, CCDrawNode *draw)
 {
 	// Add the category if it doesn't exist yet.
 	if(![_categories containsObject:category]){
-		NSAssert(_categories.count <= MAX_CATEGORIES, @"A space can only track up to %d categories.", MAX_CATEGORIES);
+		NSAssert(_categories.count < MAX_CATEGORIES, @"A space can only track up to %d categories.", MAX_CATEGORIES);
 		[_categories addObject:category];
 	}
 	

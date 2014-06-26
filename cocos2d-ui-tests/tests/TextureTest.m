@@ -18,13 +18,6 @@
 
 @implementation TextureTest
 
-- (void) setUp
-{
-	[self.contentNode removeAllChildren];
-	[CCTextureCache purgeSharedTextureCache];
-	[[CCFileUtils sharedFileUtils] setSearchPath: @[ @"Images", kCCFileUtilsDefaultSearchPath] ];
-}
-
 - (CCSprite *) loadAndDisplayImageNamed:(NSString*) fileName withTitle:(NSString*) title{
 
 	self.subTitle = title;

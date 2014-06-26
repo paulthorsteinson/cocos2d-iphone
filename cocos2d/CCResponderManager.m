@@ -103,31 +103,29 @@
     _dirty = NO;
 }
 
--( void )buildResponderList:(CCNode *)node
+- (void)buildResponderList:(CCNode *)node
 {
-    BOOL nodeAdded = NO;
-    
     // dont add invisible nodes
     if (!node.visible) return;
     
-    if ((node.children) && (node.children.count > 0))
+    BOOL shouldAddNode = node.isUserInteractionEnabled;
+    
+    if (node.children.count)
     {
-        // scan through children, and build responderlist
+        // scan through children, and build responder list
         for (CCNode *child in node.children)
         {
-            if ((child.zOrder >= 0) && (!nodeAdded) && (node.isUserInteractionEnabled))
+            if (shouldAddNode && child.zOrder >= 0)
             {
                 [self addResponder:node];
-                nodeAdded = YES;
+                shouldAddNode = NO;
             }
             [self buildResponderList:child];
         }
     }
-    else
-    {
-        // only add self
-        if (node.isUserInteractionEnabled) [self addResponder:node];
-    }
+    
+    // if eligible, add the current node to the responder list
+    if (shouldAddNode) [self addResponder:node];
 }
 
 // -----------------------------------------------------------------
@@ -478,9 +476,7 @@
 // -----------------------------------------------------------------
 
 - (void)mouseDown:(NSEvent *)theEvent button:(CCMouseButton)button
-{
-    NSAssert(![self responderForButton:button], @"Unexpected Mouse State");
-    
+{    
     if (_dirty) [self buildResponderList];
     
     // scan backwards through mouse responders

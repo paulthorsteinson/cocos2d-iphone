@@ -42,6 +42,26 @@
 //  Warnings for CCPhysicsCollisionPair methods in the wrong event cycle?
 //  Should CCPhysicsCollisionPair.userData retain?
 
+
+#if CP_USE_CGTYPES
+
+#define CCP_TO_CPV(p) (p)
+#define CPV_TO_CCP(p) (p)
+
+#define CPTRANSFORM_TO_CGAFFINETRANSFORM(t) (t)
+#define CGAFFINETRANSFORM_TO_CPTRANSFORM(t) (t)
+
+#else
+
+// If Chipmunk is not configured to use CG types then they will need to be converted.
+static inline cpVect CCP_TO_CPV(CGPoint p){return cpv(p.x, p.y);}
+static inline CGPoint CPV_TO_CCP(cpVect p){return CGPointMake(p.x, p.y);}
+
+static inline CGAffineTransform CPTRANSFORM_TO_CGAFFINETRANSFORM(cpTransform t){return CGAffineTransformMake(t.a, t.b, t.c, t.d, t.tx, t.ty);}
+static inline cpTransform CGAFFINETRANSFORM_TO_CPTRANSFORM(CGAffineTransform t){return cpTransformNew(t.a, t.b, t.c, t.d, t.tx, t.ty);}
+
+#endif
+
 @interface CCPhysicsBody (ObjectiveChipmunk)<ChipmunkObject>
 
 /** The CCNode this physics body is attached to. */
@@ -54,19 +74,29 @@
 @property(nonatomic, readonly) BOOL isRunning;
 
 /** The position of the body relative to the space. */
-@property(nonatomic, assign) cpVect absolutePosition;
+@property(nonatomic, assign) CGPoint absolutePosition;
 
 /** The rotation of the body relative to the space. */
-@property(nonatomic, assign) cpFloat absoluteRadians;
+@property(nonatomic, assign) CGFloat absoluteRadians;
+
+/** The position of the body relative to its parent node. */
+@property(nonatomic, assign) CGPoint relativePosition;
+
+/** The rotation of the body relative to its parent node. */
+@property(nonatomic, assign) CGFloat relativeRotation;
 
 /** The transform of the body relative to the space. */
-@property(nonatomic, readonly) cpTransform absoluteTransform;
+@property(nonatomic, readonly) CGAffineTransform absoluteTransform;
 
 /** Chipmunk Body. */
 @property(nonatomic, readonly) ChipmunkBody *body;
 
 /** Implements the ChipmunkObject protocol. */
 @property(nonatomic, readonly) NSArray *chipmunkObjects;
+
+/** Is static bodies transform dirty to animations */
+@property(nonatomic, readonly) BOOL isKinematicTransformDirty;
+
 
 /**
  *  Add joint to body.
@@ -104,6 +134,12 @@
  */
 -(void)didRemoveFromPhysicsNode:(CCPhysicsNode *)physics;
 
+
+/**
+ *  For static bodies that are now in motion, update their kinetic properties.
+ */
+-(void)updateKinetics:(CCTime)delta;
+
 @end
 
 
@@ -133,16 +169,27 @@
  */
 -(void)didRemoveFromPhysicsNode:(CCPhysicsNode *)physics;
 
+
+/**
+ *  TODO: 
+ *
+ *  @param transform Non riged transform.
+ */
+-(void)rescaleShape:(cpTransform)transform;
 @end
 
 
 @interface CCPhysicsJoint(ObjectiveChipmunk)<ChipmunkObject>
+
 
 /** Access to the underlying Objective-Chipmunk object. */
 @property(nonatomic, readonly) ChipmunkConstraint *constraint;
 
 /** Returns YES if the body is currently added to a physicsNode. */
 @property(nonatomic, readonly) BOOL isRunning;
+
+/** Joints can be scaled, which updates their max/min lenghts, restLengths and stiffness. */
+@property(nonatomic, assign) float scale;
 
 /**
  *  Add the join to the physics node, but only if both connected bodies are running.
@@ -165,6 +212,12 @@
  */
 -(void)willAddToPhysicsNode:(CCPhysicsNode *)physics;
 
+/**
+ *	Used to initialize the scale to a setting without adjusting the min/max/rest lengths.
+ *
+ * @param scale to be reset to.
+ */
+-(void)resetScale:(float)_scale;
 @end
 
 
@@ -180,6 +233,9 @@
 
 /** Access to the underlying Objective-Chipmunk object. */
 @property(nonatomic, readonly) ChipmunkSpace *space;
+
+/** List of nodes that are currently kinetic due to parent animations*/
+@property(nonatomic, readonly) NSMutableSet * kineticNodes;
 
 /**
  *  Intern and copy a string to ensure it can be checked by reference
@@ -222,5 +278,7 @@
  *  @return Array of collision categories.
  */
 -(NSArray *)categoriesForBitmask:(cpBitmask)categories;
+
+
 
 @end
