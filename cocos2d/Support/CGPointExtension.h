@@ -44,7 +44,7 @@
   - cpvadd( CGPointMake(1,1), CGPointMake(2,2) ); // mixing chipmunk and CG (avoid)
  */
 
-#import "ccMacros.h"
+
 
 #ifdef __CC_PLATFORM_IOS
 #import <CoreGraphics/CGGeometry.h>
