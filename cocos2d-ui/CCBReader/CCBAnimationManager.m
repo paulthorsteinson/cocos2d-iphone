@@ -599,6 +599,7 @@ static NSInteger ccbAnimationManagerID = 0;
     CCBSequence *completedSequence = [sequenceListWithId firstObject];
     int nextSeqId = completedSequence.chainedSequenceId;
     runningSequence = nil;
+    lastCompletedSequenceName = completedSequence.name;
     
     // Callbacks
     [delegate completedAnimationSequenceNamed:lastCompletedSequenceName];
