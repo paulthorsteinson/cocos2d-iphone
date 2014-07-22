@@ -1582,6 +1582,30 @@ RecursivelyIncrementPausedAncestors(CCNode *node, int increment)
 	// }
 }
 
+- (void)setName:(NSString *)name {
+    if (![name isEqualToString:_name]) {
+        _name = [self validNameForProposedName:name];
+    }
+}
+
+- (NSString *)validNameForProposedName:(NSString *)name {
+    if ([name length] > 0) {
+        // First remove from front until we have a valid starting character
+        NSCharacterSet *validHeadCharacterSet = [NSCharacterSet letterCharacterSet];
+        while ([name length] > 0 && ![validHeadCharacterSet characterIsMember:[name characterAtIndex:0]]) {
+            name = [name substringFromIndex:1];
+        }
+        
+        if ([name length] > 1) {
+            NSString *tail = [name substringFromIndex:1];
+            NSCharacterSet *validTailCharacterSet = [NSCharacterSet alphanumericCharacterSet];
+            tail = [[tail componentsSeparatedByCharactersInSet:[validTailCharacterSet invertedSet]] componentsJoinedByString:@""];
+            name = [[name substringToIndex:1] stringByAppendingString:tail];
+        }
+    }
+    return name;
+}
+
 - (void) cascadeOpacityIfNeeded
 {
 	if( _cascadeOpacityEnabled ) {
@@ -1610,6 +1634,5 @@ RecursivelyIncrementPausedAncestors(CCNode *node, int increment)
 -(BOOL) doesOpacityModifyRGB{
 	return NO; // Subclasses may use this feature.
 }
-
 
 @end
