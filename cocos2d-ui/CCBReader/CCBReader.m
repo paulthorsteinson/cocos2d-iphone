@@ -546,6 +546,9 @@ static inline float readFloat(CCBReader *self)
         if (setProp)
         {
             CCColor* cVal = [CCColor colorWithRed:r green:g blue:b alpha:a];
+            if ([name isEqualToString:@"colorRGBA"]) {
+               name = @"color";
+            }
             
             [node setValue:cVal forKey:name];
             
@@ -593,6 +596,8 @@ static inline float readFloat(CCBReader *self)
         int src = readIntWithSign(self, NO);
         int dst = readIntWithSign(self, NO);
         
+        
+        /*  Removed For SpriteKit - No Blendmodes are supported.
         if (setProp)
         {
             ccBlendFunc blend;
@@ -600,7 +605,7 @@ static inline float readFloat(CCBReader *self)
             blend.dst = dst;
             NSValue* blendVal = [NSValue value:&blend withObjCType:@encode(ccBlendFunc)];
             [node setValue:blendVal forKey:name];
-        }
+        }*/
     }
     else if (type == kCCBPropTypeFntFile)
     {
