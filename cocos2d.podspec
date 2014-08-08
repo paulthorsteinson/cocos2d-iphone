@@ -44,12 +44,11 @@ Pod::Spec.new do |s|
     ]
 		oc.header_mappings_dir = 'external'
 		oc.xcconfig = { 'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/Headers/cocos2d/Chipmunk/include/" "$(PODS_ROOT)/Headers/cocos2d/Chipmunk/objectivec/include/"' }
-		s.subspec 'kazmath' do |k|
-			k.name = 'kazmath'
-			k.source_files = 'external/kazmath/**/*.{c,h}'
-			k.public_header_files = 'external/kazmath/include/*.h'
-			k.header_mappings_dir = 'external/kazmath/include'
-		end
   end
-	
+	s.subspec 'kazmath' do |k|
+  	k.name = 'kazmath'
+  	k.source_files = 'external/kazmath/**/*.{c,h}'
+  	k.public_header_files = 'external/kazmath/include/*.h'
+  	k.header_mappings_dir = 'external/kazmath/include'
+  end
 end
