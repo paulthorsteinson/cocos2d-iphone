@@ -13,7 +13,7 @@ Pod::Spec.new do |s|
   }
   s.source = {
     :git => 'https://github.com/RobotsAndPencils/cocos2d-iphone.git',
-    :tag => 'rnp_v3.0',
+    :branch => 'rnp_pc',
     :submodules => true
   }
 	s.requires_arc = true
@@ -28,8 +28,6 @@ Pod::Spec.new do |s|
   ]
 	s.header_mappings_dir = 'cocos2d'
   s.subspec 'ObjectiveChipmunk' do |oc|
-    oc.name = 'ObjectiveChipmunk'
-		oc.requires_arc = false
 		oc.source_files = [
 	    'external/Chipmunk/src/**/*.{c,h}',
 			'external/Chipmunk/include/**/*.{c,h}',
@@ -43,10 +41,10 @@ Pod::Spec.new do |s|
       'external/Chipmunk/xcode/libglfw/include/**/*.h'
     ]
 		oc.header_mappings_dir = 'external'
+		oc.requires_arc = false
 		oc.xcconfig = { 'HEADER_SEARCH_PATHS' => '"$(PODS_ROOT)/Headers/cocos2d/Chipmunk/include/" "$(PODS_ROOT)/Headers/cocos2d/Chipmunk/objectivec/include/"' }
   end
 	s.subspec 'kazmath' do |k|
-  	k.name = 'kazmath'
   	k.source_files = 'external/kazmath/**/*.{c,h}'
   	k.public_header_files = 'external/kazmath/include/*.h'
   	k.header_mappings_dir = 'external/kazmath/include'
